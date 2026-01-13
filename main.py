@@ -1,10 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 import io
-import uvicorn
 import torch
 from torchvision import transforms
 import torch.nn as nn
 from PIL import Image
+import streamlit as st
 
 
 
@@ -79,25 +79,31 @@ class_names = [
      'ship',
      'truck'
 ]
-@check_image_app.post("/predict/")
-async def check_image(file: UploadFile = File(...)):
-    try:
-        image_data = await file.read()
-        if not image_data:
-            raise HTTPException(status_code=400, detail="Файл кошулган жок")
+st.title('CIFAR10 AI model')
+st.text('Upload image with a number, and model will recognize it')
 
-        img = Image.open(io.BytesIO(image_data))
-        img_tensor = train_transform(img).unsqueeze(0).to(device)
+file = st.file_uploader('Choose of drop an image', type=['svg', 'png', 'jpg', 'jpeg'])
 
-        with torch.no_grad():
-            y_pred = model(img_tensor)
-            pred = y_pred.argmax(dim=1).item()
+if not file:
+    st.warning('No file is uploaded')
+else:
+    st.image(file, caption='Uploaded image')
+    if st.button('Recognize the image'):
+        try:
+            image_data = file.read()
+            if not image_data:
+                raise HTTPException(status_code=400, detail='No image is given')
 
-        return {"Answer": class_names[pred]}
+            img = Image.open(io.BytesIO(image_data)).convert("RGB")  # ✅ Конвертация в RGB
+            img_tensor = train_transform(img).unsqueeze(0).to(device)
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            with torch.no_grad():
+                y_pred = model(img_tensor)
+                pred = y_pred.argmax(dim=1).item()
 
-if __name__ == '__main__':
-    uvicorn.run(check_image_app, host='127.0.0.1', port=8003)
+            st.success({"Answer": class_names[pred]})
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
 
